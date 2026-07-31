@@ -837,6 +837,15 @@ input[type="range"]::-webkit-slider-thumb {
 const ffmpeg = new FFmpegWASM.FFmpeg();
 const { fetchFile, toBlobURL } = FFmpegUtil;
 
+// Cross-origin isolation check for multi-threaded core
+function isCrossOriginIsolated() {
+  try {
+    return window.crossOriginIsolated === true;
+  } catch (e) {
+    return false;
+  }
+}
+
 let ffmpegLoaded = false;
 let currentFile = null;
 let currentFileData = null;
@@ -867,7 +876,10 @@ function setFFmpegStatus(status) {
 (async function loadFFmpeg() {
   setFFmpegStatus('loading');
   try {
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    // GitHub Pages doesn't send COOP/COEP headers, so SharedArrayBuffer is unavailable.
+    // Use single-threaded core to avoid SharedArrayBuffer requirement.
+    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.12.6/dist/esm';
+    console.log('Loading FFmpeg single-threaded core from', baseURL);
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'application/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -876,7 +888,7 @@ function setFFmpegStatus(status) {
   } catch (e) {
     console.error('FFmpeg 加载失败:', e);
     setFFmpegStatus('error');
-    showToast('FFmpeg 加载失败，请刷新页面重试', 'error');
+    showToast('FFmpeg 加载失败: ' + (e.message || e), 'error');
   }
 })();
 
